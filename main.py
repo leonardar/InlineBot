@@ -1,51 +1,51 @@
-import telebot
-from spellchecker import SpellChecker
+import requests
+import time
 
-# Замените 'YOUR_API_TOKEN' на ваш токен API от BotFather
-API_TOKEN = '7765015743:AAFkS54j5ERLfsz8D1cqAplEU8Ogo9uwM50'
+# Токен доступа к Telegram Bot API
+TOKEN = '7601054207:AAGP-L-4dLtdEz8s5WbU6dRi73ePf8gd_8E'
+# URL для обращения к API Telegram Bot
+URL = 'https://api.telegram.org/bot'
 
-# Создаем объект бота с указанным API токеном
-bot = telebot.TeleBot(API_TOKEN)
+# Функция для получения обновлений от Telegram сервера
+def get_updates(offset=0):
+    # Запрос обновлений с параметром offset
+    result = requests.get(f'{URL}{TOKEN}/getUpdates?offset={offset}').json()
+    # Возвращаем результат в виде списка обновлений
+    return result['result']
 
-# Создаем объект SpellChecker для проверки орфографии (русский язык)
-spell = SpellChecker(language='ru')
+# Функция для отправки сообщения пользователю
+def send_message(chat_id, text):
+    # Отправляем сообщение по указанному chat_id
+    requests.get(f'{URL}{TOKEN}/sendMessage?chat_id={chat_id}&text={text}')
 
-# Обработчик для команд /start и /help
-@bot.message_handler(commands=['start', 'help'])
-def send_welcome(message):
-    bot.reply_to(message, "Добро пожаловать в программу проверки орфографии!")
+# Функция для проверки сообщения и отправки ответа
+def check_message(chat_id, message):
+    # Перебираем слова в сообщении
+    for mes in message.lower().replace(',', '').split():
+        # Проверяем на приветствия и отправляем ответ
+        if mes in ['привет', 'здравствуйте', 'хай', 'hello', 'hi', 'приветствую']:
+            send_message(chat_id, 'Привет :)')
+        # Проверяем на запрос о состоянии дел и отправляем ответ
+        if mes in ['как дела?', 'как ты?', 'дела?']:
+            send_message(chat_id, 'Спасибо, хорошо!')
 
-# Обработчик для всех остальных сообщений
-@bot.message_handler(func=lambda message: True)
-def check_message(message):
-    # Разбиваем сообщение на слова и приводим к нижнему регистру
-    mes = message.text.lower().replace(',', '').split()
+# Основная функция для запуска бота
+def run():
+    # Получаем ID последнего сообщения
+    update_id = get_updates()[-1]['update_id']
+    while True:
+        # Задержка перед следующим запросом обновлений
+        time.sleep(2)
+        # Получаем новые обновления
+        messages = get_updates(update_id)
+        for message in messages:
+            # Проверяем, есть ли новые сообщения
+            if update_id < message['update_id']:
+                # Обновляем ID последнего сообщения
+                update_id = message['update_id']
+                # Проверяем и обрабатываем новое сообщение
+                check_message(message['message']['chat']['id'], message['message']['text'])
 
-    # Проверяем на приветствия и отправляем ответ
-    if any(word in mes for word in ['привет', 'здравствуйте', 'хай', 'hello', 'hi', 'приветствую']):
-        bot.reply_to(message, 'Привет, какое слово ты хочешь проверить?')
-        return
-    # Проверяем на запрос о проверке орфографии
-    elif any(word in mes for word in ['проверка', 'проверить']):
-        bot.reply_to(message, 'Введите слово для проверки:')
-        bot.register_next_step_handler(message, spell_checker_bot)
-        return
-    else:
-        # Если сообщение не является приветствием или запросом проверки орфографии, проверяем само сообщение
-        spell_checker_bot(message)
-
-# Функция для проверки орфографии слова
-def spell_checker_bot(message):
-    word = message.text.lower()
-
-    # Проверяем, есть ли слово в словаре
-    if word in spell:
-        bot.reply_to(message, f"Слово '{word}' написано правильно.")
-    else:
-        # Находим возможные исправления
-        corrections = spell.candidates(word)
-        bot.reply_to(message, f"Слово '{word}' написано неправильно. Возможно, вы имели в виду: {', '.join(corrections)}")
-
-# Запускаем бота
-
-bot.polling()
+# Точка входа в программу
+if __name__ == '__main__':
+    run()
